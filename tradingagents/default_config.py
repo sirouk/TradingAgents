@@ -106,6 +106,16 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # unbounded reasoning/output and hangs or trips a gateway idle timeout
     # (e.g. some deepseek-v4-flash deployments, #1204).
     "max_tokens": None,
+    # Per-role LLM fallback chains. When a role's primary client raises (rate
+    # limit, timeout, provider outage), the call is retried down the chain via
+    # LangChain with_fallbacks — e.g. subscription OAuth (CLIProxy) primary
+    # with a per-token spare (Chutes). Shape (or identical JSON in
+    # TRADINGAGENTS_LLM_FALLBACKS, which .env can carry; config takes precedence):
+    #   {"deep":  [{"model": "moonshotai/Kimi-K3-TEE", "provider": "openai_compatible",
+    #               "backend_url": "https://llm.chutes.ai/v1", "api_key": "cpk_..."}],
+    #    "quick": [{"model": "Qwen/Qwen3.8-27B-TEE", ...}]}
+    # per-entry provider/backend_url/api_key default to the primary config when omitted.
+    "llm_fallbacks": None,
     # Checkpoint/resume: when True, LangGraph saves state after each node
     # so a crashed run can resume from the last successful step.
     "checkpoint_enabled": False,

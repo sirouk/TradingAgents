@@ -10,6 +10,16 @@ Breaking changes within the 0.x line are called out explicitly.
 
 ### Added
 
+- **Per-role LLM fallback chains** (`llm_fallbacks` config or
+  `TRADINGAGENTS_LLM_FALLBACKS` JSON in `.env`): when a deep/quick role's
+  primary client raises — subscription OAuth throttling, timeouts, provider
+  outages — LangChain `with_fallbacks` retries the call on the next chain
+  entry. Chains can cross providers and lanes (e.g. CLIProxy Claude primary
+  with a Chutes per-token spare); per-entry `provider`/`backend_url`/`api_key`
+  default to the primary config when omitted.
+
+- **Binance spot vendor for long-tail crypto.** New `binance` vendor serving
+
 - **Binance spot vendor for long-tail crypto.** New `binance` vendor serving
   `core_stock_apis` and `technical_indicators` from Binance's public (keyless)
   daily klines, wired as a trailing entry in the default vendor chains

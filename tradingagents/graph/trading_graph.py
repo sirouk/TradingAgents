@@ -76,6 +76,52 @@ def _coerce_max_tokens(value):
     return n
 
 
+# --- LLM fallback chains ---------------------------------------------------
+
+def _parse_llm_fallbacks(value) -> dict[str, list[dict[str, Any]]]:
+    """Normalize the ``llm_fallbacks`` config shape.
+
+    Accepts None (no fallbacks), a dict (already structured), or a JSON string
+    (the TRADINGAGENTS_LLM_FALLBACKS env form). Shape::
+
+        {"deep":  [{"model": ..., "provider"?: ..., "backend_url"?: ...,
+                    "api_key"?: ..., ...}],
+         "quick": [ ... ]}
+
+    Each entry needs ``model``; missing ``provider``/``backend_url`` inherit
+    the primary config at build time. Unknown roles raise — a typo like
+    ``"dep"`` silently disabling the intended fallback is worse than failing
+    loudly at startup.
+    """
+    if value is None or value == "" or value == {}:
+        return {}
+    if isinstance(value, str):
+        import json as _json
+        try:
+            value = _json.loads(value)
+        except ValueError as e:
+            raise ValueError(
+                f"TRADINGAGENTS_LLM_FALLBACKS is not valid JSON: {e}"
+            ) from e
+    if not isinstance(value, dict):
+        raise ValueError("llm_fallbacks must be a dict or JSON string")
+
+    normalized: dict[str, list[dict[str, Any]]] = {}
+    for role, entries in value.items():
+        if role not in ("deep", "quick"):
+            raise ValueError(f"llm_fallbacks role {role!r} unknown (expected 'deep' or 'quick')")
+        if not isinstance(entries, list):
+            raise ValueError(f"llm_fallbacks[{role!r}] must be a list of model entries")
+        checked = []
+        for entry in entries:
+            if not isinstance(entry, dict) or not entry.get("model"):
+                raise ValueError(f"llm_fallbacks[{role!r}] entries need at least a 'model' key: {entry!r}")
+            checked.append(dict(entry))
+        if checked:
+            normalized[role] = checked
+    return normalized
+
+
 class TradingAgentsGraph:
     """Main class that orchestrates the trading agents framework."""
 
@@ -125,8 +171,13 @@ class TradingAgentsGraph:
             **llm_kwargs,
         )
 
-        self.deep_thinking_llm = deep_client.get_llm()
-        self.quick_thinking_llm = quick_client.get_llm()
+        fallbacks = _parse_llm_fallbacks(
+            self.config.get("llm_fallbacks")
+            if self.config.get("llm_fallbacks")
+            else os.environ.get("TRADINGAGENTS_LLM_FALLBACKS")
+        )
+        self.deep_thinking_llm = self._attach_fallbacks(deep_client.get_llm(), "deep", fallbacks, llm_kwargs)
+        self.quick_thinking_llm = self._attach_fallbacks(quick_client.get_llm(), "quick", fallbacks, llm_kwargs)
 
         self.memory_log = TradingMemoryLog(self.config)
 
@@ -164,6 +215,32 @@ class TradingAgentsGraph:
         self.graph = self.workflow.compile()
         self._checkpointer_ctx = None
         self._resuming = False
+
+    def _attach_fallbacks(self, primary, role: str, fallbacks: dict, llm_kwargs: dict):
+        """Chain provider fallbacks behind a role client via LangChain with_fallbacks.
+
+        Any exception from the primary (rate-limit, timeout, provider outage)
+        retries the same call on the next entry in the chain — subscription
+        OAuth lanes (CLIProxy Claude, Codex) throttle under agent swarms, and a
+        paid per-token spare (Chutes) keeps the run alive at bounded cost.
+        Entries inherit provider/backend from the primary config unless
+        overridden; per-entry api_key / temperature / max_tokens pass through.
+        """
+        entries = fallbacks.get(role) or []
+        if not entries:
+            return primary
+        models = []
+        runnables = []
+        for entry in entries:
+            entry = dict(entry)
+            model = entry.pop("model")
+            provider = entry.pop("provider", self.config["llm_provider"])
+            base_url = entry.pop("backend_url", self.config.get("backend_url"))
+            kwargs = {**llm_kwargs, **entry}  # api_key etc. pass through to the client ctor
+            runnables.append(create_llm_client(provider=provider, model=model, base_url=base_url, **kwargs).get_llm())
+            models.append(model)
+        logger.info("LLM %s fallbacks: %s", role, " -> ".join(models))
+        return primary.with_fallbacks(runnables)
 
     def _get_provider_kwargs(self) -> dict[str, Any]:
         """Get provider-specific kwargs for LLM client creation."""
