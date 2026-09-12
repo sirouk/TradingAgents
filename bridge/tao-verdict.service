@@ -1,0 +1,14 @@
+[Unit]
+Description=TradingAgents TAO external-verdict bridge (tao-fleet pod)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# One run at a time, hard cap: never let a hang eat the next slot.
+ExecStart=/usr/bin/flock -n /run/tao-verdict.lock /root/TradingAgents/.venv/bin/python /root/TradingAgents/bridge/tao_verdict.py --target-dir /root/tao-fleet
+TimeoutStartSec=65min
+WorkingDirectory=/root/TradingAgents
+User=root
+StandardOutput=append:/root/TradingAgents/bridge-logs/service.log
+StandardError=append:/root/TradingAgents/bridge-logs/service.log
