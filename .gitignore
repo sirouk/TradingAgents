@@ -225,3 +225,5 @@ reports/
 # Local run artifacts (never push analysis logs/scratch runners)
 run_tao.py
 logs_*.txt
+# local deploy answers for bridge/deploy.sh (contains host paths + bind addr)
+.deploy.env

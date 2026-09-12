@@ -11,7 +11,7 @@ Contract (report-only, mirrors fleet rules):
 
 Usage:
   python bridge/tao_verdict.py [--date YYYY-MM-DD] [--symbol TAO-USD]
-      [--target-dir /root/tao-fleet]
+      [--target-dir ~/tao-fleet]
 """
 
 import argparse
