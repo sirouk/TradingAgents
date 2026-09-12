@@ -28,8 +28,15 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("tao_verdict_bridge")
 
-REPO = Path("/root/TradingAgents")
-LOGS = REPO / "bridge-logs"
+# Location-independent: resolves from the script's own path so the bridge runs
+# in a container or under any user, with env overrides for systemd/docker units.
+REPO = Path(os.environ.get("TAO_BRIDGE_REPO", Path(__file__).resolve().parents[1]))
+LOGS = Path(
+    os.environ.get(
+        "TAO_BRIDGE_LOG_DIR",
+        os.path.join(os.path.expanduser("~"), ".tradingagents", "bridge-logs"),
+    )
+)
 
 
 def atomic_write(path: Path, content: str) -> None:
@@ -37,7 +44,9 @@ def atomic_write(path: Path, content: str) -> None:
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=path.name, suffix=".tmp")
     with os.fdopen(fd, "w") as f:
         f.write(content)
-    os.chmod(tmp, 0o600)
+    # Group-readable: the files+DM cadence lane consumes these drops as another
+    # host user (the fleet workspace uses a setgid group). Owner stays rw.
+    os.chmod(tmp, 0o640)
     os.rename(tmp, path)
 
 
@@ -76,7 +85,8 @@ def main() -> int:
     ap.add_argument("--date", default=time.strftime("%Y-%m-%d"))
     ap.add_argument("--symbol", default="TAO-USD")
     ap.add_argument("--asset-type", default="crypto")
-    ap.add_argument("--target-dir", default="/root/tao-fleet")
+    ap.add_argument("--target-dir", default=os.environ.get(
+        "TAO_BRIDGE_TARGET_DIR", str(Path.home() / "tao-fleet")))
     ap.add_argument("--max-minutes", type=int, default=55)
     args = ap.parse_args()
 
