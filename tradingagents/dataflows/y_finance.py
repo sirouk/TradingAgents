@@ -73,16 +73,10 @@ def get_YFin_data_online(
 
     return header + csv_string
 
-def get_stock_stats_indicators_window(
-    symbol: Annotated[str, "ticker symbol of the company"],
-    indicator: Annotated[str, "technical indicator to get the analysis and report of"],
-    curr_date: Annotated[
-        str, "The current trading date you are trading on, YYYY-mm-dd"
-    ],
-    look_back_days: Annotated[int, "how many days to look back"],
-) -> str:
-
-    best_ind_params = {
+# Indicator name -> analyst-facing description. Module-level so sibling OHLCV
+# vendors (Binance crypto) emit the same reference text the Market Analyst
+# already knows how to read.
+INDICATOR_DESCRIPTIONS = {
         # Moving Averages
         "close_50_sma": (
             "50 SMA: A medium-term trend indicator. "
@@ -155,9 +149,19 @@ def get_stock_stats_indicators_window(
         ),
     }
 
-    if indicator not in best_ind_params:
+
+def get_stock_stats_indicators_window(
+    symbol: Annotated[str, "ticker symbol of the company"],
+    indicator: Annotated[str, "technical indicator to get the analysis and report of"],
+    curr_date: Annotated[
+        str, "The current trading date you are trading on, YYYY-mm-dd"
+    ],
+    look_back_days: Annotated[int, "how many days to look back"],
+) -> str:
+
+    if indicator not in INDICATOR_DESCRIPTIONS:
         raise ValueError(
-            f"Indicator {indicator} is not supported. Please choose from: {list(best_ind_params.keys())}"
+            f"Indicator {indicator} is not supported. Please choose from: {list(INDICATOR_DESCRIPTIONS.keys())}"
         )
 
     end_date = curr_date
@@ -207,7 +211,7 @@ def get_stock_stats_indicators_window(
         f"## {indicator} values from {before.strftime('%Y-%m-%d')} to {end_date}:\n\n"
         + ind_string
         + "\n\n"
-        + best_ind_params.get(indicator, "No description available.")
+        + INDICATOR_DESCRIPTIONS.get(indicator, "No description available.")
     )
 
     return result_str

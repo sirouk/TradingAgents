@@ -42,8 +42,15 @@ _FOREX_CURRENCIES = frozenset(
 )
 
 # Crypto bases that brokers quote against USD without a separator.
+# Long-tail additions must be verified absent from Yahoo before being added,
+# otherwise broker forms of a Yahoo-covered coin would detour to a different
+# vendor than plain ``<BASE>-USD`` input for the same asset (#982).
 _CRYPTO_BASES = frozenset(
-    {"BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"}
+    {
+        "BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX",
+        "LINK",
+        "TAO",  # Bittensor — on Binance (TAOUSDT), NOT served by Yahoo Finance
+    }
 )
 
 # Explicit aliases for instruments whose broker symbol does not map to a

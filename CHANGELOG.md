@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes within the 0.x line are called out explicitly.
 
+## [Unreleased]
+
+### Added
+
+- **Binance spot vendor for long-tail crypto.** New `binance` vendor serving
+  `core_stock_apis` and `technical_indicators` from Binance's public (keyless)
+  daily klines, wired as a trailing entry in the default vendor chains
+  (`yfinance,binance`). Yahoo still answers everything it covers; symbols it
+  has no history for but Binance lists (e.g. `TAO-USD` / `TAOUSDT`) are now
+  analyzable instead of hitting the NO_DATA sentinel. Non-crypto symbols are
+  rejected before any network call so the equity path is unchanged, and the
+  indicator description map is shared between the two OHLCV vendors.
+- **Bittensor (TAO) recognized end-to-end**: `_CRYPTO_BASES` gains `TAO` so
+  broker forms (`TAOUSDT`, `TAOUSD`) normalize to `TAO-USD` and the CLI's
+  crypto pipeline auto-selects; Reddit sentiment searches the asset name
+  "Bittensor" instead of the noisy symbol.
+
 ## [0.4.0] — 2026-08-31
 
 Look-ahead and point-in-time fixes across the data and memory layers, clearer

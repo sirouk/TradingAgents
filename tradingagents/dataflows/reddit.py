@@ -38,6 +38,12 @@ from urllib.request import Request, urlopen
 from .date_window import in_window
 from .symbol_utils import crypto_base
 
+# Reddit search works by full-text match; alias tickers whose symbol collides
+# with common words to the asset's actual name.
+_REDDIT_SEARCH_ALIASES = {
+    "TAO": "Bittensor",
+}
+
 logger = logging.getLogger(__name__)
 
 
@@ -284,6 +290,9 @@ def fetch_reddit_posts(
     # Crypto reaches us as a Yahoo pair (BTC-USD); search Reddit for the base
     # ("BTC") so the query actually matches discussion instead of near-nothing.
     ticker = crypto_base(ticker) or ticker
+    # Short generic tickers match far more noise than signal ("TAO" the
+    # philosophy, ...); search by the project's name instead.
+    ticker = _REDDIT_SEARCH_ALIASES.get(ticker, ticker)
     subreddits = list(subreddits)
     blocks = []
     total_posts = 0

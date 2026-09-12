@@ -1,0 +1,101 @@
+================================ Human Message =================================
+
+TAO-USD
+================================== Ai Message ==================================
+
+I'll analyze TAO-USD comprehensively. Let me start by gathering the necessary market data.
+Tool Calls:
+  get_stock_data (toolu_01SxJ8zfv1Dj7Z5gyVjfgiWn)
+ Call ID: toolu_01SxJ8zfv1Dj7Z5gyVjfgiWn
+  Args:
+    symbol: TAO-USD
+    start_date: 2026-08-13
+    end_date: 2026-09-12
+  get_verified_market_snapshot (toolu_017VMGDhctVPcra7GsYVaift)
+ Call ID: toolu_017VMGDhctVPcra7GsYVaift
+  Args:
+    symbol: TAO-USD
+    curr_date: 2026-09-12
+    look_back_days: 30
+Traceback (most recent call last):
+  File "/root/TradingAgents/run_tao.py", line 19, in <module>
+    state, signal = ta.propagate("TAO-USD", "2026-09-12", asset_type="crypto")
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/tradingagents/graph/trading_graph.py", line 426, in propagate
+    return self._run_graph(
+           ^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/tradingagents/graph/trading_graph.py", line 539, in _run_graph
+    for chunk in self.graph.stream(graph_input, **args):
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langgraph/pregel/main.py", line 2967, in stream
+    for _ in runner.tick(
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langgraph/pregel/_runner.py", line 207, in tick
+    run_with_retry(
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langgraph/pregel/_retry.py", line 617, in run_with_retry
+    return task.proc.invoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langgraph/_internal/_runnable.py", line 707, in invoke
+    input = context.run(step.invoke, input, config, **kwargs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langgraph/_internal/_runnable.py", line 447, in invoke
+    ret = self.func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langgraph/prebuilt/tool_node.py", line 822, in _func
+    outputs = list(
+              ^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/_base.py", line 619, in result_iterator
+    yield _result_or_cancel(fs.pop())
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/_base.py", line 317, in _result_or_cancel
+    return fut.result(timeout)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langchain_core/runnables/config.py", line 650, in _wrapped_fn
+    return contexts.pop().run(fn, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langgraph/prebuilt/tool_node.py", line 1046, in _run_one
+    return self._execute_tool_sync(tool_request, input_type, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langgraph/prebuilt/tool_node.py", line 1006, in _execute_tool_sync
+    content = _handle_tool_error(e, flag=self._handle_tool_errors)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langgraph/prebuilt/tool_node.py", line 434, in _handle_tool_error
+    content = flag(e)  # type: ignore [assignment, call-arg]
+              ^^^^^^^
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langgraph/prebuilt/tool_node.py", line 391, in _default_handle_tool_errors
+    raise e
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langgraph/prebuilt/tool_node.py", line 958, in _execute_tool_sync
+    response = tool.invoke(call_args, config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langchain_core/tools/base.py", line 764, in invoke
+    return self.run(tool_input, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langchain_core/tools/base.py", line 1132, in run
+    raise error_to_raise
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langchain_core/tools/base.py", line 1098, in run
+    response = context.run(self._run, *tool_args, **tool_kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/.venv/lib/python3.12/site-packages/langchain_core/tools/structured.py", line 152, in _run
+    return self.func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/tradingagents/agents/utils/market_data_validation_tools.py", line 23, in get_verified_market_snapshot
+    return build_verified_market_snapshot(symbol, curr_date, look_back_days)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/tradingagents/dataflows/market_data_validator.py", line 72, in build_verified_market_snapshot
+    df = _verified_rows(symbol, curr_date)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/tradingagents/dataflows/market_data_validator.py", line 35, in _verified_rows
+    data = load_ohlcv(symbol, curr_date)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/TradingAgents/tradingagents/dataflows/stockstats_utils.py", line 273, in load_ohlcv
+    _assert_ohlcv_not_stale(data, curr_date, symbol, canonical)
+  File "/root/TradingAgents/tradingagents/dataflows/stockstats_utils.py", line 159, in _assert_ohlcv_not_stale
+    raise NoMarketDataError(
+tradingagents.dataflows.errors.NoMarketDataError: No market data for 'TAO-USD': latest row is 2022-03-14, 1643 days before the requested 2026-09-12 (stale) — refusing to use it
+During task with name 'tools_market' and id '6f8b851b-de18-5e27-2057-b9bbc1706c09'

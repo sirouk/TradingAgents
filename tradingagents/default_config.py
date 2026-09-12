@@ -137,8 +137,11 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # routed to vendors you didn't choose. For ordered fallback, list several,
     # e.g. "yfinance,alpha_vantage". "default" uses all available vendors.
     "data_vendors": {
-        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
-        "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
+        # "binance" serves crypto pairs Yahoo does not list (TAO & other USDT-quoted
+        # alts) via Binance spot — keyless. Kept trailing: equities never reach it
+        # (a non-crypto symbol is rejected before any network call).
+        "core_stock_apis": "yfinance,binance",       # Options: alpha_vantage, yfinance, binance
+        "technical_indicators": "yfinance,binance",  # Options: alpha_vantage, yfinance, binance
         "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
         "news_data": "yfinance",             # Options: alpha_vantage, yfinance
         "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)

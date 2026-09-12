@@ -15,6 +15,7 @@ from collections.abc import Iterable
 import pandas as pd
 from stockstats import wrap
 
+from tradingagents.dataflows.errors import NoMarketDataError
 from tradingagents.dataflows.stockstats_utils import load_ohlcv
 
 # A fixed, common indicator set so the snapshot is the same shape every run.
@@ -25,14 +26,31 @@ DEFAULT_SNAPSHOT_INDICATORS: tuple[str, ...] = (
 )
 
 
-def _verified_rows(symbol: str, curr_date: str) -> pd.DataFrame:
-    """OHLCV on or before curr_date, date-sorted. Raises if nothing usable.
+def _load_ohlcv_chain(symbol: str, curr_date: str) -> tuple[pd.DataFrame, str]:
+    """Loader chain mirroring the ``core_stock_apis`` vendor order.
 
-    ``load_ohlcv`` already normalizes the Date column and filters out
-    look-ahead rows, but we re-apply the cutoff defensively — this is a
-    verification path, so it must not trust its input to be pre-filtered.
+    This verification path bypasses ``route_to_vendor`` (it needs a DataFrame,
+    not a report string), so it repeats the chain here: yfinance first, then
+    the Binance crypto vendor for symbols Yahoo does not cover (TAO & other
+    long-tail alts). Import is lazy so the equity path never pays for it.
     """
-    data = load_ohlcv(symbol, curr_date)
+    try:
+        return load_ohlcv(symbol, curr_date), "yfinance"
+    except NoMarketDataError:
+        from tradingagents.dataflows.binance import load_binance_ohlcv
+
+        return load_binance_ohlcv(symbol, curr_date), "Binance spot"
+
+
+def _verified_rows(symbol: str, curr_date: str) -> tuple[pd.DataFrame, str]:
+    """OHLCV on or before curr_date, date-sorted, plus the data source name.
+
+    Raises if nothing usable. The loaders already normalize the Date column
+    and filter out look-ahead rows, but we re-apply the cutoff defensively —
+    this is a verification path, so it must not trust its input to be
+    pre-filtered.
+    """
+    data, source = _load_ohlcv_chain(symbol, curr_date)
     if data is None or data.empty:
         raise ValueError(f"No OHLCV data available for {symbol}.")
 
@@ -42,7 +60,7 @@ def _verified_rows(symbol: str, curr_date: str) -> pd.DataFrame:
     df = df[df["Date"] <= pd.to_datetime(curr_date)].sort_values("Date")
     if df.empty:
         raise ValueError(f"No OHLCV rows on or before {curr_date} for {symbol}.")
-    return df
+    return df, source
 
 
 def _fmt(value) -> str:
@@ -69,7 +87,7 @@ def build_verified_market_snapshot(
     # `df` keeps the original capitalized OHLCV columns (Open/High/Low/Close/
     # Volume); stockstats `wrap()` lowercases columns and adds indicator
     # columns, so read raw prices from `df` and indicators from `stock_df`.
-    df = _verified_rows(symbol, curr_date)
+    df, source = _verified_rows(symbol, curr_date)
     stock_df = wrap(df.copy())
 
     selected = tuple(indicators or DEFAULT_SNAPSHOT_INDICATORS)
@@ -89,6 +107,7 @@ def build_verified_market_snapshot(
     lines = [
         f"## Verified market data snapshot for {symbol.upper()}",
         "",
+        f"- Data source: {source}",
         f"- Requested analysis date: {curr_date}",
         f"- Latest trading row used: {latest_date}",
         "- Rows after the requested analysis date are excluded before verification.",

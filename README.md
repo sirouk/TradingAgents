@@ -178,7 +178,9 @@ TradingAgents works with any market Yahoo Finance covers, using the exchange-suf
 - Hong Kong: `0700.HK` · Tokyo: `7203.T` · London: `AZN.L`
 - India: `RELIANCE.NS`, `.BO` · Canada: `.TO` · Australia: `.AX`
 - China A-shares: Shanghai `.SS`, Shenzhen `.SZ` (e.g. `600519.SS` for Kweichow Moutai)
-- Crypto: `BTC-USD`, `ETH-USD`
+- Crypto: `BTC-USD`, `ETH-USD`. Pairs Yahoo does not list fall back to the Binance
+  spot vendor (keyless daily klines), e.g. `TAO-USD` / `TAOUSDT`; broker-style
+  forms (`BTCUSD`, `ETHUSDT`) normalize automatically
 
 <p align="center">
   <img src="assets/cli/cli_init.png" width="100%" style="display: inline-block; margin: 0 2%;">
