@@ -100,15 +100,40 @@ def normalize_rating(rating):
     return "REVIEW"
 
 
-def latest_close(symbol: str) -> float | None:
-    """Deterministic last close from the Binance vendor (advisory context)."""
+def latest_close(symbol: str, as_of: str | None = None,
+                 _fetch_klines=None, _resolve=None) -> float | None:
+    """Deterministic last close from the Binance vendor (advisory context).
+
+    Vintage rule: ``as_of`` pins the reference to that analysis date's close
+    (last daily bar with date <= as_of) — a weekend TAO date earns its real
+    weekend close from Binance's continuous calendar, not a weekday
+    carry-forward and NOT "today's price". ``as_of=None`` preserves the
+    realtime behaviour (close as of right now).
+    """
     try:
-        from tradingagents.dataflows.binance import resolve_binance_symbol, fetch_klines_df
+        from tradingagents.dataflows.binance import (
+            resolve_binance_symbol as _real_resolve,
+            fetch_klines_df as _real_fetch,
+        )
         from datetime import datetime, timedelta
-        end = datetime.utcnow().strftime("%Y-%m-%d")
-        start = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
-        df = fetch_klines_df(resolve_binance_symbol(symbol), start, end)
-        return float(df["Close"].iloc[-1]) if not df.empty else None
+        fetch = _fetch_klines or _real_fetch
+        resolve = _resolve or _real_resolve
+        anchor = (
+            datetime.strptime(as_of, "%Y-%m-%d") if as_of else datetime.utcnow()
+        )
+        end = anchor.strftime("%Y-%m-%d")
+        start = (anchor - timedelta(days=7)).strftime("%Y-%m-%d")
+        df = fetch(resolve(symbol), start, end)
+        if df is None or df.empty:
+            return None
+        # floor at as_of: exclude bars dated after the analysis date (the vendor's
+        # historical cap should already, but this is the field the scorecard
+        # trusts — belt and braces for an advisory input).
+        if as_of:
+            df = df[df["Date"].astype(str).str[:10] <= as_of]
+            if df.empty:
+                return None
+        return float(df["Close"].iloc[-1])
     except Exception as e:  # advisory field — never fail the bridge on it
         log.warning("latest_close advisory fetch failed: %s", e)
         return None
@@ -185,7 +210,7 @@ def main() -> int:
             stop_loss=pm["stop_loss"] or trader["stop_loss"],
             position_sizing=pm["position_sizing"] or trader["position_sizing"],
             executive_summary=pm["executive_summary"],
-            reference_close=latest_close(args.symbol),
+            reference_close=latest_close(args.symbol, args.date),
             notes="signal=%s" % signal,
         )
         md = state.get("final_trade_decision", "")
