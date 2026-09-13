@@ -25,7 +25,12 @@ Endpoints (all /api/* require `Authorization: Bearer <token>`):
   GET  /api/jobs/{id}                 job record + verdict summary
   GET  /api/jobs/{id}/verdict.json    run artifacts
   GET  /api/jobs/{id}/verdict.md
-  GET  /api/verdict/latest.json|.md   latest finished verdict (flat contract files)
+  GET  /api/verdict/latest.json|.md   latest finished verdict across ALL symbols
+                                      (symbol-agnostic cadence file: newest finished run
+                                      of any symbol wins; safe for single-symbol desks)
+  GET  /api/verdict/latest/{symbol}.json|.md
+                                      newest finished verdict for THAT symbol only;
+                                      404 when none yet — never another symbol's verdict
 
 Config via env (no secrets in argv):
   VERDICT_API_TOKEN_FILE  file holding the bearer token (mode 0600)  [or VERDICT_API_TOKEN]
@@ -314,6 +319,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._artifact(STORE / "external_verdict.json", "application/json")
         if path == "/api/verdict/latest.md":
             return self._artifact(STORE / "external_verdict.md", "text/markdown")
+        m = re.match(r"^/api/verdict/latest/([^/]+)\.(json|md)$", path)
+        if m:
+            return self._latest_for_symbol(m.group(1).upper(), m.group(2))
         if path == "/api/jobs":
             lim = 50
             m = re.search(r"(?:^|&)limit=(\d+)", qs)
@@ -497,6 +505,25 @@ class Handler(BaseHTTPRequestHandler):
         if len(body) > 32 * 1024 * 1024:
             return self._send(413, {"error": "bundle too large; fetch per-symbol"})
         return self._send(200, body)
+
+    def _latest_for_symbol(self, symbol, kind):
+        """Newest FINISHED verdict for one symbol. Never crosses symbols.
+
+        The plain /api/verdict/latest.json stays symbol-agnostic by design:
+        it serves the newest finished run of ANY symbol, as the single-desk
+        cadence file. This route is for consumers tracking one symbol: the
+        newest finished run for THAT symbol only, 404 when there is none.
+        """
+        if not SYMBOL.match(symbol):
+            return self._send(400, {"error": "bad symbol"})
+        rows = db_rows("SELECT id FROM jobs WHERE symbol=? AND state='finished' "
+                       "ORDER BY finished_at DESC LIMIT 1", (symbol,))
+        if not rows:
+            return self._send(404, {"error": f"no finished verdict for {symbol}"})
+        jdir = job_dir(rows[0]["id"])
+        name = "external_verdict.json" if kind == "json" else "external_verdict.md"
+        return self._artifact(jdir / name,
+                              "application/json" if kind == "json" else "text/markdown")
 
     def _artifact(self, path: Path, ctype):
         if not path.exists():

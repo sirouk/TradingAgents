@@ -66,6 +66,40 @@ def parse_pm(decision_md: str) -> dict:
             "executive_summary": (summary or "").strip()[:2000] or None}
 
 
+# Canonical closed ratings vocabulary: Buy / Sell / Hold / REVIEW.
+# The PM writes free-form labels ("Overweight", "Trim", "Accumulate",
+# Chinese or German locale words, ...); consumers must never be asked to
+# guess. Unknown or empty -> REVIEW (fail closed = no opinion). The raw
+# model text is preserved in ``rating_raw``.
+_BUY_WORDS = {"buy", "long", "overweight", "over weight", "ow", "strong buy",
+              "accumulate", "outperform", "add", "top pick", "bullish"}
+_SELL_WORDS = {"sell", "short", "underweight", "under weight", "uw", "strong sell",
+               "reduce", "trim", "exit", "avoid", "bearish"}
+_HOLD_WORDS = {"hold", "neutral", "maintain", "market perform", "in-line",
+               "in line", "equal weight", "equal-weight", "ew", "sidelines",
+               "stay flat", "no change", "keep"}
+
+
+def normalize_rating(rating):
+    """Map an LLM-freeform rating onto the closed {Buy,Sell,Hold,REVIEW} set.
+
+    Fails closed: anything unrecognized becomes REVIEW (no opinion), never a
+    guess. ``None`` stays ``None`` (used by the all-null failure artifact).
+    """
+    if rating is None:
+        return None
+    words = re.sub(r"[\s*_]+", " ", str(rating).strip().lower()).strip()
+    if words in ("review", "no opinion", "skip", "abstain"):
+        return "REVIEW"
+    if words in _BUY_WORDS:
+        return "Buy"
+    if words in _SELL_WORDS:
+        return "Sell"
+    if words in _HOLD_WORDS:
+        return "Hold"
+    return "REVIEW"
+
+
 def latest_close(symbol: str) -> float | None:
     """Deterministic last close from the Binance vendor (advisory context)."""
     try:
@@ -114,6 +148,7 @@ def main() -> int:
         "elapsed_seconds": None,
         "run_ok": False,
         "rating": None,
+        "rating_raw": None,
         "stop_loss": None,
         "position_sizing": None,
         "executive_summary": None,
@@ -140,9 +175,11 @@ def main() -> int:
         trader_plan = state.get("trader_investment_plan", "")
         pm = parse_pm(decision_md)
         trader = parse_pm(trader_plan)
+        rating_raw = pm["rating"] or (signal if signal else None)
         verdict.update(
             run_ok=True,
-            rating=pm["rating"] or (signal if signal else None),
+            rating=normalize_rating(rating_raw) if rating_raw else None,
+            rating_raw=rating_raw,
             # PM sometimes writes stop/sizing as prose; the trader's plan carries
             # the labeled fields — fall back to it rather than emit nulls.
             stop_loss=pm["stop_loss"] or trader["stop_loss"],

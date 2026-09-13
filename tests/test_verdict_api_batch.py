@@ -69,7 +69,7 @@ class ApiServer:
                 time.sleep(0.05)
         raise RuntimeError("api under test never came up")
 
-    def _req(self, method, path, payload=None, auth=True):
+    def _req(self, method, path, payload=None, auth=True, raw=False):
         url = self.base + path
         data = json.dumps(payload).encode() if payload is not None else None
         req = urllib.request.Request(url, data=data, method=method)
@@ -79,12 +79,19 @@ class ApiServer:
             req.add_header("Authorization", f"Bearer {TOKEN}")
         try:
             with urllib.request.urlopen(req, timeout=10) as r:
-                return r.status, json.loads(r.read())
+                body = r.read()
+                return r.status, (body.decode() if raw else json.loads(body))
         except urllib.error.HTTPError as e:
+            ebody = e.read() or b"{}"
+            if raw:
+                return e.code, ebody.decode()
             try:
-                return e.code, json.loads(e.read() or b"{}")
+                return e.code, json.loads(ebody)
             except json.JSONDecodeError:
                 return e.code, {}
+
+    def get_raw(self, path, auth=True):
+        return self._req("GET", path, None, auth, raw=True)
 
     def post(self, path, payload=None, auth=True):
         return self._req("POST", path, payload, auth)
@@ -262,3 +269,41 @@ def test_fail_verdict_carries_job_id(api):
     assert code == 200
     assert art["job_id"] == run["job_id"]
     assert art["run_ok"] is False and art["rating"] is None
+
+
+# ---- symbol-scoped latest ----------------------------------------------------
+
+def _finish(api, jdir_jobid, symbol, rating, finished_at):
+    m = api.module
+    jd = m.job-dir(jdir_jobid) if False else m.job_dir(jdir_jobid)
+    jd.mkdir(parents=True, exist_ok=True)
+    (jd / "external_verdict.json").write_text(json.dumps({
+        "job_id": jdir_jobid, "symbol": symbol, "analysis_date": "2026-09-10",
+        "run_ok": True, "rating": rating, "reference_close": 1.0}))
+    (jd / "external_verdict.md").write_text("# report\n")
+    m.db_exec("UPDATE jobs SET state='finished', run_ok=1, rating=?, finished_at=? WHERE id=?",
+              (rating, finished_at, jdir_jobid))
+
+
+def test_latest_for_symbol_never_crosses_symbols(api):
+    _, tao = api.post("/api/run", {"symbol": "TAO-USD", "date": "2026-09-10"})
+    _, btc = api.post("/api/run", {"symbol": "BTC-USD", "date": "2026-09-10"})
+    # finish TAO first (older finished_at), BTC after: global latest is BTC,
+    # the symbol route must still rig the desk the TAO artifact
+    _finish(api, tao["job_id"], "TAO-USD", "Hold", "2026-09-10T01:00:00+00:00")
+    _finish(api, btc["job_id"], "BTC-USD", "Buy", "2026-09-10T02:00:00+00:00")
+    code, art = api.get("/api/verdict/latest/TAO-USD.json")
+    assert code == 200
+    assert art["symbol"] == "TAO-USD" and art["rating"] == "Hold"
+    code, md = api.get_raw("/api/verdict/latest/BTC-USD.md")
+    assert code == 200 and "report" in md
+
+
+def test_latest_for_symbol_404_when_none(api):
+    code, body = api.get("/api/verdict/latest/DOGE-USD.json")
+    assert code == 404 and "DOGE-USD" in body["error"]
+
+
+def test_latest_for_symbol_validates_symbol(api):
+    code, body = api.get("/api/verdict/latest/TAO$.json")
+    assert code == 400 and "bad symbol" in body["error"]
