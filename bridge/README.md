@@ -51,6 +51,11 @@ Artifact contract (what consumers can rely on):
   (falling back to the trader plan). On a Hold/maintain call the PM commonly
   prints no labelled stop, so **null = "no stop stated", never a parser failure**
   — consumers must not read a null stop as a signal.
+- On failure ALL verdict fields are null (rating, stop_loss, sizing, summary,
+  reference_close). A failed run emits no numbers at all — this is contract,
+  not an oversight: plausible-looking data on a failed run is worse than none.
+- queue `position` counts queued jobs only; the running job is not counted, so
+  position=1 means "next to run after the current run finishes".
 - `generated_at` is the host's UTC clock stamp of when the artifact was written.
   For staleness gating record your own fetched_at and compute age from that.
 
