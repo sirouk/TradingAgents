@@ -73,6 +73,9 @@ DEFAULT_CONFIG = _apply_env_overrides({
     "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
     "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", os.path.join(_TRADINGAGENTS_HOME, "logs")),
     "data_cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR", os.path.join(_TRADINGAGENTS_HOME, "cache")),
+    # Prediction markets: kill switch ("off" strips the tool from the news
+    # analyst entirely) and optional as-of vintage for backfilled runs.
+    "enable_prediction_markets": True,
     "memory_log_path": os.getenv("TRADINGAGENTS_MEMORY_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "memory", "trading_memory.md")),
     # Optional cap on the number of resolved memory log entries. When set,
     # the oldest resolved entries are pruned once this limit is exceeded.

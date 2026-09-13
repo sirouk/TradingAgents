@@ -285,7 +285,21 @@ class TradingAgentsGraph:
         return kwargs
 
     def _create_tool_nodes(self) -> dict[str, ToolNode]:
-        """Create tool nodes for different data sources using abstract methods."""
+        """Create tool nodes for different data sources using abstract methods.
+
+        Note: tests call this unbound (self is None) to inspect the tool map
+        without spinning up LLM clients — keep self optional.
+        """
+        cfg = getattr(self, "config", None) or {}
+        news_tools = [
+            # News and insider information
+            get_news,
+            get_global_news,
+            get_insider_transactions,
+            get_macro_indicators,
+        ]
+        if cfg.get("enable_prediction_markets", True):
+            news_tools.append(get_prediction_markets)
         return {
             "market": ToolNode(
                 [
@@ -305,16 +319,7 @@ class TradingAgentsGraph:
                     get_news,
                 ]
             ),
-            "news": ToolNode(
-                [
-                    # News and insider information
-                    get_news,
-                    get_global_news,
-                    get_insider_transactions,
-                    get_macro_indicators,
-                    get_prediction_markets,
-                ]
-            ),
+            "news": ToolNode(news_tools),
             "fundamentals": ToolNode(
                 [
                     # Fundamental analysis tools
