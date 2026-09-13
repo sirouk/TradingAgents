@@ -39,6 +39,21 @@ Bare-metal alternative (no containers):
     systemctl daemon-reload && systemctl enable --now tao-verdict.timer
     systemctl start tao-verdict.service                # manual fire
 
+
+Artifact contract (what consumers can rely on):
+
+- `job_id` is embedded in every JSON artifact (first field), including the
+  synthesized run_ok=false failures, so any stored file is self-identifying.
+  `latest.json` carries the job_id of the run that produced it.
+- `date` in POST /api/run is honoured end to end (`--date` -> propagate), so
+  backfill works: request a past `YYYY-MM-DD` to re-analyse that session.
+- `stop_loss` / `position_sizing` are surfaced verbatim from the PM decision
+  (falling back to the trader plan). On a Hold/maintain call the PM commonly
+  prints no labelled stop, so **null = "no stop stated", never a parser failure**
+  — consumers must not read a null stop as a signal.
+- `generated_at` is the host's UTC clock stamp of when the artifact was written.
+  For staleness gating record your own fetched_at and compute age from that.
+
 Logs go where you point them (StandardOutput=append:<path> in the unit, or
 docker logs verdict-api). No secrets belong in this repo: keys live only in the
 env file the runner mounts (0600), and deploy.sh never echoes them.

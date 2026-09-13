@@ -113,9 +113,9 @@ def job_dir(jid):
     return HISTORY / jid
 
 
-def write_fail_verdict(jdir, symbol, date, notes):
+def write_fail_verdict(jdir, jid, symbol, date, notes):
     jdir.mkdir(parents=True, exist_ok=True)
-    verdict = {"symbol": symbol, "analysis_date": date, "generated_at": now_iso(),
+    verdict = {"job_id": jid, "symbol": symbol, "analysis_date": date, "generated_at": now_iso(),
                "elapsed_seconds": None, "run_ok": False, "rating": None, "stop_loss": None,
                "position_sizing": None, "executive_summary": None, "reference_close": None,
                "llm_lane": None, "full_report": None, "notes": notes}
@@ -142,7 +142,7 @@ def reap_stale():
     for r in db_rows("SELECT * FROM jobs WHERE state IN ('running','queued')"):
         jd = job_dir(r["id"])
         if not (jd / "external_verdict.json").exists():
-            write_fail_verdict(jd, r["symbol"], r["analysis_date"],
+            write_fail_verdict(jd, r["id"], r["symbol"], r["analysis_date"],
                                "FAILED: api restart interrupted the run before a verdict was written")
         db_exec("UPDATE jobs SET state='failed', finished_at=?, error=? WHERE id=?",
                 (now_iso(), "reaped at api startup", r["id"]))
@@ -159,7 +159,7 @@ def worker():
         jdir = job_dir(jid)
         jdir.mkdir(parents=True, exist_ok=True)
         db_exec("UPDATE jobs SET state='running', started_at=? WHERE id=?", (now_iso(), jid))
-        cmd = ["python", BRIDGE, "--date", row["analysis_date"], "--symbol", row["symbol"],
+        cmd = ["python", BRIDGE, "--job-id", jid, "--date", row["analysis_date"], "--symbol", row["symbol"],
                "--asset-type", row["asset_type"], "--target-dir", str(jdir)]
         log.info("job %s starting: %s %s", jid, row["symbol"], row["analysis_date"])
         try:
@@ -177,7 +177,7 @@ def worker():
             vpath = jdir / "external_verdict.json"
             run_ok = rating = None
             if not vpath.exists():
-                write_fail_verdict(jdir, row["symbol"], row["analysis_date"],
+                write_fail_verdict(jdir, jid, row["symbol"], row["analysis_date"],
                                    "FAILED: runner timeout/kill before verdict write" if timed_out
                                    else "FAILED: bridge exited without writing a verdict")
             try:
@@ -194,7 +194,7 @@ def worker():
             log.info("job %s %s run_ok=%s rating=%s", jid, state, run_ok, rating)
         except Exception as e:
             log.exception("job %s runner error", jid)
-            write_fail_verdict(jdir, row["symbol"], row["analysis_date"],
+            write_fail_verdict(jdir, jid, row["symbol"], row["analysis_date"],
                                f"FAILED: api runner {type(e).__name__}: {e}")
             db_exec("UPDATE jobs SET state='failed', finished_at=?, error=? WHERE id=?",
                     (now_iso(), str(e), jid))

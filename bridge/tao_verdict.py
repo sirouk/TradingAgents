@@ -84,6 +84,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", default=time.strftime("%Y-%m-%d"))
     ap.add_argument("--symbol", default="TAO-USD")
+    ap.add_argument("--job-id", default=None)
     ap.add_argument("--asset-type", default="crypto")
     ap.add_argument("--target-dir", default=os.environ.get(
         "TAO_BRIDGE_TARGET_DIR", str(Path.home() / "tao-fleet")))
@@ -98,6 +99,7 @@ def main() -> int:
     md_path = target / "external_verdict.md"
 
     verdict = {
+        "job_id": args.job_id,
         "symbol": args.symbol,
         "analysis_date": args.date,
         "generated_at": None,
