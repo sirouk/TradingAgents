@@ -62,3 +62,27 @@ Artifact contract (what consumers can rely on):
 Logs go where you point them (StandardOutput=append:<path> in the unit, or
 docker logs verdict-api). No secrets belong in this repo: keys live only in the
 env file the runner mounts (0600), and deploy.sh never echoes them.
+
+## Backfill & batch surface (one API for realtime + history)
+
+The same API serves realtime and historical requests; both lanes share the
+queue and the store, with two fairness and integrity rules:
+
+- POST /api/backfill {"symbols": [...], "start_date", "end_date", "asset_type"}
+  enqueues one verdict per symbol x calendar-day cell (depth capped by
+  VERDICT_API_BACKFILL_MAX_DAYS, default 180) and returns a batch_id. Cells
+  already in-flight across either lane are skipped (dedupe is global, by
+  symbol+date). A run for today is just a realtime run.
+- Fairness: workers (VERDICT_API_WORKERS, default 2) always claim interactive
+  /api/run jobs before backfill jobs, so a 1,400-cell sweep can never starve
+  a realtime request.
+- Vintage integrity: any run whose analysis date is in the past pins the
+  prediction-market vendor to that date's CLOB price history
+  (~hourly-resolution point-in-time odds; volume figures omitted as
+  retrospective-by-construction), and writes into a batch-scoped memory log
+  instead of the realtime lane's memory. Historical runs never see today's
+  odds or today's verdicts.
+- Readback: GET /api/backfill/{id} (spec + state counts),
+  /api/backfill/{id}/verdicts.json (every cell keyed symbol -> date) or
+  /verdicts/{symbol}.json (one symbol). 90-day retention (VERDICT_API_RETENTION_DAYS)
+  applies to artifacts identically in both lanes.

@@ -91,6 +91,14 @@ def main() -> int:
     ap.add_argument("--max-minutes", type=int, default=55)
     args = ap.parse_args()
 
+    # Backfill integrity: a run for a past date must never see today's odds.
+    # Pin the prediction-market vendor to that date's vintage prices
+    # (~hourly-resolution CLOB history); a run for today stays live.
+    today_utc = time.strftime("%Y-%m-%d", time.gmtime())
+    if args.date < today_utc:
+        os.environ.setdefault("TA_PREDICTION_MARKETS_ASOF", args.date)
+        log.info("backfill run: prediction markets pinned to vintage odds as of %s", args.date)
+
     from dotenv import load_dotenv
     load_dotenv(REPO / ".env")
 
